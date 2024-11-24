@@ -1,4 +1,5 @@
-use egui::{Button, Label, Visuals};
+use egui::{Button, Label, Visuals, Color32};
+use std::time::{Duration, SystemTime};
 use core::fmt;
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;
@@ -183,6 +184,10 @@ pub struct ChessVisualizationApp {
     result: String,
     current_streak: i32,
     best_streak: i32,
+    #[serde(skip)]
+    last_time: Duration,
+    #[serde(skip)]
+    start_time: SystemTime,
 }
 
 impl Default for ChessVisualizationApp {
@@ -192,6 +197,8 @@ impl Default for ChessVisualizationApp {
             result: "".to_string(),
             current_streak: 0,
             best_streak: 0,
+            last_time: Duration::default(),
+            start_time: SystemTime::now(),
         }
     }
 }
@@ -213,18 +220,22 @@ impl ChessVisualizationApp {
     }
 
     fn evaluate_answer(&mut self, answer: &SquareColor) {
+        self.last_time = self.start_time.elapsed().expect("Expected elapsed time");
+        self.start_time = SystemTime::now();
+
         if self.square.is_color_correct(answer) {
-            self.result = format!("Correct {} is {:?}", self.square, answer);
+            self.result = format!("Correct {} is {:?} your guess took {}ms", self.square, answer, self.last_time.as_millis());
             self.current_streak += 1;
         }
         else {
-            self.result = format!("Wrong {} is not {:?}", self.square, answer);
+            self.result = format!("Wrong {} is not {:?} your guess took {}ms", self.square, answer, self.last_time.as_millis());
             self.current_streak = 0;
         }
 
         self.best_streak = self.best_streak.max(self.current_streak);
 
         self.square = rand::random();
+        self.start_time = SystemTime::now();
     }
 }
 
@@ -266,13 +277,15 @@ impl eframe::App for ChessVisualizationApp {
                 ui.add(Label::new(&self.result));
             }
 
-            if ui.add(Button::new("Dark")).clicked() {
-                self.evaluate_answer(&SquareColor::Dark);
-            }
+            ui.horizontal(|ui| {
+                if ui.add_sized([100.0, 100.0], Button::new("").fill(Color32::BLACK)).clicked() {
+                    self.evaluate_answer(&SquareColor::Dark);
+                }
 
-            if ui.add(Button::new("Light")).clicked() {
-                self.evaluate_answer(&SquareColor::Light);
-            } 
+                if ui.add_sized([100.0, 100.0], Button::new("").fill(Color32::WHITE)).clicked() {
+                    self.evaluate_answer(&SquareColor::Light);
+                } 
+            });
 
             ui.separator();
 
